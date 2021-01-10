@@ -1,9 +1,9 @@
-<a href="https://www.buymeacoffee.com/Jorx" target="_blank"><img src="https://cdn.buymeacoffee.com/buttons/lato-yellow.png" alt="Buy Me A Coffee" height="41" width="174"></a>
-
 # sc2mqtt
 Skoda Connect 2 MQTT 
 
-This is a connector between Skoda Connect and your smart home software (best connects with Home Assistant, but should work with any MQTT-capable).
+This version is based on sc2mqtt from https://github.com/DBa2016/sc2mqtt
+
+This is a connector between Skoda Connect and your smart home software via MQTT. This version is modified to have also Loxone timestamps (epoche date is from 01.01.2009 in Loxone).
 
 ## Limitations
 - no trip and position information right now published in MQTT
@@ -28,20 +28,23 @@ The program does not go to background, I recommend using a daemon manager. My pe
 ## Usage
 Call the sc2mqtt.py file directly. It will search for `config.json` in the current directory; if none found (or an invalid one), it will create a `config.json.sample` and exit.
 
+You can use the following command line options:
+
+--configfile=path_to_configfile/config.json: Use the configfile path_to_configfile/config.json instead von config.json in current folder
+
+--logfile=path_to_configfile/logfile.log Log all messages also to path_to_configfile/logfile.log
+
+--loglevel=[info|error|debug] Use this loglevel instead of the standard loglevel
+
 Upon successful start, it will poll Skoda Connect every 60 seconds for a status update on every vehicle detected for the account and post the sensor values over MQTT.
 
 ## TODO
 - add more queryable content (trip data, heater, etc.)
-- add MQTT authentication
 - add SSL for MQTT
-- make more stuff configurable
 - tidy up code; it has been written for me only, so is probably difficult to read for others.
 - extend funcitonality to allow "write" operations (lock/unlock, switch standby heating on/off etc.)
 - extend functionality to other VAG brands (VW, Audi, Seat)
 
-## Contributions
-Current modus operandi: if you want to contribute, please fork the repo and create a PR - I will review and eventually merge. Creating readable code makes reviews easier and therefore faster :)
-Or you can buy me a coffee (click on the logo at the beginning of the page).
-
 ## Thanks
 - original idea by https://github.com/TA2k/ioBroker.vw-connect ; some information (URLs etc.) borrowed from there, too
+- original script by https://github.com/DBa2016/sc2mqtt

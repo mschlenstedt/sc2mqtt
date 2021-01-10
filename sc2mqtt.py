@@ -10,6 +10,7 @@ import json
 import logging
 import asyncio
 from functools import partial
+from datetime import datetime
 
 import paho.mqtt.client as mqtt
 from pathlib import Path
@@ -70,6 +71,7 @@ STATLIMITS = [
     { "mask": r"STATE.*COVER", "check": "window_closed", "fail": 0 },
 ]
 
+
 # Defaults and Command line
 logfile=""
 configfile="config.json"
@@ -84,14 +86,17 @@ for opt, arg in opts:
         configfile=arg
 
 #logging.basicConfig(level=logging.INFO)
-_LOGGER = setup_logger("s2m")
+_LOGGER = setup_logger("sc2mqtt")
+_LOGGER.debug("Commandline option --logfile: %s", logfile)
+_LOGGER.debug("Commandline option --loglevel: %s", loglevel)
+_LOGGER.debug("Commandline option --configfile: %s", configfile)
 
 
 async def main():
 
     try:
         global cfo
-        with open("config.json", "r") as cfile:
+        with open(configfile, "r") as cfile:
             cfo = json.load(cfile)
 
         for el in ["user", "password", "broker"]:
@@ -100,6 +105,8 @@ async def main():
                 return False
         if "topic" not in cfo:
             cfo["topic"] = "skoda2mqtt"
+        if "expand_json_data" not in cfo:
+            cfo["expand_json_data"] = ""
         ad = SkodaAdapter(cfo["user"], cfo["password"])
         await ad.init()
         mqttc = mqtt.Client()
@@ -126,15 +133,16 @@ async def main():
 
         return True
 
-
     except FileNotFoundError:
         _LOGGER.critical("Config file not found!")
         await configSample()
         return False
+
     except json.decoder.JSONDecodeError:
         _LOGGER.critical("Config file found and readable, invalid contents!")
         await configSample()
         return False
+
 
 
 async def configSample():
@@ -393,58 +401,90 @@ class SkodaAdapter:
 
             for vin,stateDict in self.vehicleStates.items():
                 publishdict = {}
-                mainjtopic = "%s/%s/JSTATE" % (cfo["topic"], vin)
-                mainstopic = "%s/%s/JSTATE"% (cfo["topic"], vin)
-                mainctopic = "homeassistant/sensor/%s/%s/config" % (cfo["topic"], vin)
-                maincpayload = '{"state_topic": "%s","json_attributes_topic": "%s", "unique_id": "s2m_%s", "name": "S2M_%s", "value_template": "{{ value_json.GENERAL_STATUS }}" }' % (
-                    mainstopic, mainjtopic,
-                    vin,
-                    vin
-                )
+                #mainjtopic = "%s/%s/JSTATE" % (cfo["topic"], vin)
+                #mainstopic = "%s/%s/JSTATE"% (cfo["topic"], vin)
+                #mainctopic = "homeassistant/sensor/%s/%s/config" % (cfo["topic"], vin)
+                #maincpayload = '{"state_topic": "%s","json_attributes_topic": "%s", "unique_id": "s2m_%s", "name": "S2M_%s", "value_template": "{{ value_json.GENERAL_STATUS }}" }' % (
+                #    mainstopic, mainjtopic,
+                #    vin,
+                #    vin
+                #)
                 #mqttc.publish(
                 #    mainctopic,
                 #    maincpayload
                 #)
-                status = 2 # locked
+                #status = 2 # locked
                 for stateId,state in stateDict.items():
-                    if stateId in self.statusValues and state != "" and ("textId" not in state or stateId in self.statusValues and  not re.match(r".*(?:(?:(un)|(not_)supported)|(?:invalid)).*", state["textId"])):
+                    #if stateId in self.statusValues and state != "" and ("textId" not in state or stateId in self.statusValues and  not re.match(r".*(?:(?:(un)|(not_)supported)|(?:invalid)).*", state["textId"])):
+                    if stateId in self.statusValues and state != "":
                         if "textId" not in state or "." in state["textId"]:
                             state["textId"] = state["value"]
                         if "calc" in self.statusValues[stateId]:
                             state["value"] = self.statusValues[stateId]["calc"](state["value"])
-                        _LOGGER.info("%s -> %s(%s)" %(self.statusValues[stateId]["statusName"], state["textId"], state["value"]))
-                        stopic = "%s/%s_%s/STATE"% (cfo["topic"], vin, self.statusValues[stateId]["statusName"])
-                        spayload = "%s(%s)" %(state["textId"], state["value"]) if state["textId"] != state["value"] else state["value"]
-                        if stateId not in self.configured:
-                            self.configured.append(stateId)
-                            ctopic = "homeassistant/sensor/%s/%s_%s/config" % (cfo["topic"], vin, self.statusValues[stateId]["statusName"])
-                            cpayload = {
-                                "state_topic": stopic,
-                                "unique_id": "s2m_%s_%s" %(vin, self.statusValues[stateId]["statusName"]),
-                                "name": "s2m_%s_%s" % (vin, self.statusValues[stateId]["statusName"])
-                            }
+                        if "value" not in state:
+                            state["value"] = "-9999"
+                       
+                        _LOGGER.info("%s -> %s (%s)" %(self.statusValues[stateId]["statusName"], state["textId"], state["value"]))
+                       
+                        topic = "%s/%s/%s/state" %(cfo["topic"], vin, self.statusValues[stateId]["statusName"])
+                        for el in ["id", "value", "textId", "unit", "tsCarSentUtc", "tsCarSent", "tsTssReceivedUtc", "tsCarCaptured", "milCarCaptured", "milCarSent"]:
+                            if el not in state:
+                                state[el] = "none"
 
-                            if "unit_of_measurement" in self.statusValues[stateId] and self.statusValues[stateId]["unit_of_measurement"] != "":
-                                cpayload["unit_of_measurement"] = self.statusValues[stateId]["unit_of_measurement"]
+                        # Convert datetimes
+                        if state["tsCarSentUtc"] != "none":
+                            epoche = datetime.strptime(state["tsCarSentUtc"], '%Y-%m-%dT%H:%M:%SZ').timestamp()
+                            loxtsCarSentUTC = int(epoche - datetime.strptime("2009-01-01 00:00:00", '%Y-%m-%d %H:%M:%S').timestamp())
+                        if state["tsCarSent"] != "none":
+                            epoche = datetime.strptime(state["tsCarSent"], '%Y-%m-%dT%H:%M:%S').timestamp()
+                            loxtsCarSent = int(epoche - datetime.strptime("2009-01-01 00:00:00", '%Y-%m-%d %H:%M:%S').timestamp())
+                        if state["tsTssReceivedUtc"] != "none":
+                            epoche = datetime.strptime(state["tsTssReceivedUtc"], '%Y-%m-%dT%H:%M:%SZ').timestamp()
+                            loxtsTssReceivedUtc = int(epoche - datetime.strptime("2009-01-01 00:00:00", '%Y-%m-%d %H:%M:%S').timestamp())
+                        if state["tsCarCaptured"] != "none":
+                            epoche = datetime.strptime(state["tsCarCaptured"], '%Y-%m-%dT%H:%M:%S').timestamp()
+                            loxtsCarCaptured = int(epoche - datetime.strptime("2009-01-01 00:00:00", '%Y-%m-%d %H:%M:%S').timestamp())
 
-                            mqttc.publish(ctopic, json.dumps(cpayload))
-                        mqttc.publish(stopic, spayload)
+                        payload = {
+                                "Id": state["id"],
+                                "Name": self.statusValues[stateId]["statusName"],
+                                "Value": state["value"],
+                                "TextId": state["textId"],
+                                "Unit": state["unit"],
+                                "milCarCaptured": state["milCarCaptured"],
+                                "milCarSent": state["milCarSent"],
+                                "tsCarSentUtc": state["tsCarSentUtc"],
+                                "tsCarSentUtcLox": loxtsCarSentUTC,
+                                "tsCarSent": state["tsCarSent"],
+                                "tsCarSentLox": loxtsCarSent,
+                                "tsTssReceivedUtc": state["tsTssReceivedUtc"],
+                                "tsTssReceivedUtcLox": loxtsTssReceivedUtc,
+                                "tsCarCaptured": state["tsCarCaptured"],
+                                "tsCarCapturedLox": loxtsCarCaptured,
+                        }
 
-                        publishdict[self.statusValues[stateId]["statusName"]] = {"value": state["value"], "textId": state["textId"]};
-                        for sl in STATLIMITS:
-                            if(re.match(sl["mask"], self.statusValues[stateId]["statusName"]) and sl["check"] != state["textId"]):
-                                status = sl["fail"] if status > sl["fail"] else status
-                publishdict["GENERAL_STATUS"] = ["open", "closed", "locked"][status]
+                        if cfo["expand_json_data"] == "1" or cfo["expand_json_data"] == "true" or cfo["expand_json_data"] == "True":
+                            for key in payload:
+                                mqttc.publish(topic + '/' + key, payload[key])
+                                _LOGGER.debug("MQTT: %s/%s: %s" %(topic, key, payload[key]))
+                        
+                        else:
+                            mqttc.publish(topic, json.dumps(payload))
+                            _LOGGER.debug("MQTT: %s: %s" %(topic, json.dumps(payload)))
 
-                #mqttc.publish(
-                #    mainjtopic,
-                #    json.dumps(publishdict)
-                #)
+                    else:
+
+                        if "id" not in state: state["id"] = "none"
+                        if "value" not in state: state["value"] = "none"
+                        if "unit" not in state: state["unit"] = "none"
+                        if "textId" not in state: state["textId"] = "none"
+                        _LOGGER.error("Unknown Feature %s -> %s (%s)" %(state["id"], state["textId"], state["value"]))
 
             await asyncio.sleep(60)
 
             
     async def getVehicleStatus(self, vin):
+        _LOGGER.debug("Getting Vehicle Status for %s", vin)
         url = await self.replaceVarInUrl("$homeregion/fs-car/bs/vsr/v1/$type/$country/vehicles/$vin/status", vin)
         accept = "application/json"
         r = (await self.execRequest({
@@ -458,9 +498,13 @@ class SkodaAdapter:
                     "Accept": accept,
             }
         })).json()
+        _LOGGER.debug("Received JSON: %s", r)
         if "StoredVehicleDataResponse" not in r or "vehicleData" not in r["StoredVehicleDataResponse"] or "data" not in r["StoredVehicleDataResponse"]["vehicleData"]:
             return False
-        self.vehicleStates[vin] = dict([(e["id"],e if "value" in e else "") for f in [s["field"] for s in r["StoredVehicleDataResponse"]["vehicleData"]["data"]] for e in f])
+
+        #self.vehicleStates[vin] = dict( [(e["id"],e if "value" in e else "") for f in [s["field"] for s in r["StoredVehicleDataResponse"]["vehicleData"]["data"]] for e in f] )
+        self.vehicleStates[vin] = dict( [(e["id"],e) for f in [s["field"] for s in r["StoredVehicleDataResponse"]["vehicleData"]["data"]] for e in f] )
+        _LOGGER.debug("Vehicle States: %s", self.vehicleStates[vin])
 
 
     async def getVehicleStatus_orig(self, vin, url, path, element, element2, element3, element4):
