@@ -38,6 +38,18 @@ __--loglevel=[info|error|debug]__: Use this loglevel instead of the standard log
 
 Upon successful start, it will poll Skoda Connect every 60 seconds for a status update on every vehicle detected for the account and post the sensor values over MQTT.
 
+## Configuration
+Configuration is done in the file `config.json` in the same directory as `sc2mqtt.py`. You can use another location with --configfile option (see above). The following options exist:
+
+   * broker :  Address of your mqtt broker
+   * brokerport : Port of your mqtt broker
+   * topic : Topic under which all messages will be published. Defaults to "sc2mqtt"
+   * brokeruser : Username of your broker if you use authentication
+   * brokerpassword : Password of your broker if you use authentication
+   * user : SkodaConnect Username
+   * password : SkodaConnect Password
+   * expand_json_data : Set to "1" if you would like to expand the json data in the mqtt topics. Set to "0" will send json data to mqtt.
+
 ## TODO
 - add more queryable content (trip data, heater, etc.)
 - add SSL for MQTT

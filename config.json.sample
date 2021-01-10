@@ -2,7 +2,6 @@
    "broker" : "",
    "brokerport" : "1883",
    "topic" : "sc2mqtt",
-   "brokerauth" : "0",
    "brokeruser" : "",
    "brokerpassword" : "",
    "user" : "",

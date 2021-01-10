@@ -149,10 +149,14 @@ async def configSample():
     _LOGGER.critical("Writing sample config as config.json.sample, please adjust as needed and save as config.json!")
     with open("config.json.sample", "w") as cfile:
         json.dump({
-            "user": "test@example.com",
-            "password": "my_very_speciaL_passw0rd",
-            "topic": "skoda2mqtt",
-            "broker": "mqtt.local"
+            "broker" : "",
+            "brokerport" : "1883",
+            "topic" : "sc2mqtt",
+            "brokeruser" : "",
+            "brokerpassword" : "",
+            "user" : "",
+            "password" : "",
+            "expand_json_data" : "1"
         }, cfile)
 
 
