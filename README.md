@@ -30,11 +30,11 @@ Call the sc2mqtt.py file directly. It will search for `config.json` in the curre
 
 You can use the following command line options:
 
---configfile=path_to_configfile/config.json: Use the configfile path_to_configfile/config.json instead von config.json in current folder
+__--configfile=/path/to/configfile/config.json__: Use the configfile `/path/to/configfile/config.json` instead von config.json in current folder
 
---logfile=path_to_configfile/logfile.log Log all messages also to path_to_configfile/logfile.log
+__--logfile=/path/to/configfile/logfile.log__: Log all messages also to `/path/to/configfile/logfile.log``
 
---loglevel=[info|error|debug] Use this loglevel instead of the standard loglevel
+__--loglevel=[info|error|debug]__: Use this loglevel instead of the standard loglevel
 
 Upon successful start, it will poll Skoda Connect every 60 seconds for a status update on every vehicle detected for the account and post the sensor values over MQTT.
 
