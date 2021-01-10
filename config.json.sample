@@ -1,1 +1,11 @@
-{"user": "test@example.com", "password": "my_very_speciaL_passw0rd", "topic": "skoda2mqtt", "broker": "mqtt.local"}
+{
+   "broker" : "",
+   "brokerport" : "1883",
+   "topic" : "sc2mqtt",
+   "brokerauth" : "0",
+   "brokeruser" : "",
+   "brokerpassword" : "",
+   "user" : "",
+   "password" : "",
+   "expand_json_data" : "1"
+}
