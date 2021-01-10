@@ -3,7 +3,7 @@ Skoda Connect 2 MQTT
 
 This version is based on sc2mqtt from https://github.com/DBa2016/sc2mqtt
 
-This is a connector between Skoda Connect and your smart home software via MQTT. This version is modified to have also Loxone timestamps (epoche date is from 01.01.2009 in Loxone).
+This is a connector between Skoda Connect and your smart home software via MQTT. This version is modified to have also Loxone timestamps (epoche date is from 01.01.2009 in Loxone). Also MQTT handling and config is enhanced compared to the original version.
 
 ## Limitations
 - no trip and position information right now published in MQTT
