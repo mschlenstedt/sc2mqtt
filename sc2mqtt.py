@@ -204,6 +204,7 @@ class SkodaAdapter:
         "0x0204040002":{"statusName": "OIL_LEVEL_MINIMUM_WARNING", "unit_of_measurement": ""},
         "0x0204040003":{"statusName": "OIL_LEVEL_DIPSTICK_PERCENTAGE", "unit_of_measurement": "%"},
         "0x0301010001":{"statusName": "LIGHT_STATUS", "unit_of_measurement": ""},
+        "0x0301030004":{"statusName": "SPEED", "unit_of_measurement": "kmh"},
         "0x0301030005":{"statusName": "TOTAL_RANGE", "unit_of_measurement": "km"},
         "0x030103000A":{"statusName": "FUEL_LEVEL_IN_PERCENTAGE", "unit_of_measurement": "%"},
         "0x030103000D":{"statusName": "CNG_LEVEL_IN_PERCENTAGE", "unit_of_measurement": "%"},
