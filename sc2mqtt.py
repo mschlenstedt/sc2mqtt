@@ -583,7 +583,6 @@ class SkodaAdapter:
 
         #self.vehicleStates[vin] = dict( [(e["id"],e if "value" in e else "") for f in [s["field"] for s in r["StoredVehicleDataResponse"]["vehicleData"]["data"]] for e in f] )
         self.vehicleStates[vin] = dict( [(e["id"],e) for f in [s["field"] for s in r["StoredVehicleDataResponse"]["vehicleData"]["data"]] for e in f] )
-        _LOGGER.debug("Vehicle States: %s", self.vehicleStates[vin])
 
 
     async def getVehicleStatus_orig(self, vin, url, path, element, element2, element3, element4):
@@ -663,6 +662,7 @@ class SkodaAdapter:
             "followAllRedirects": True
         })
         self.vehicleData[vin] = r.json()
+        _LOGGER.debug("Received JSON: %s", r.json())
         return r
 
       
@@ -737,6 +737,7 @@ class SkodaAdapter:
         except VWThrottledException:
             self.throttle_wait = int(time.time()) + 30*60
             pass
+
 
     async def getHomeRegion(self, vin = ""):
         if vin == "":
@@ -1057,7 +1058,8 @@ class SkodaAdapter:
     def __init__(self, email, password, spin):
         self.config = {
             "country": "CZ",
-            "xappversion": "3.4.2",
+            #"xappversion": "3.4.2",
+            "xappversion": "3.2.6",
             "xappname": "cz.skodaauto.connect",
             "xClientId": "28cd30c6-dee7-4529-a0e6-b1e07ff90b79",
             "client_id": "7f045eee-7003-4379-9968-9355ed2adb06%40apps_vw-dilab_com",
