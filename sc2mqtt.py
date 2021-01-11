@@ -99,7 +99,7 @@ async def main():
         with open(configfile, "r") as cfile:
             cfo = json.load(cfile)
 
-        for el in ["user", "password", "broker"]:
+        for el in ["user", "password", "spin", "broker"]:
             if el not in cfo:
                 _LOGGER.critical("No %s defined in config file" % el)
                 return False
@@ -107,7 +107,7 @@ async def main():
             cfo["topic"] = "skoda2mqtt"
         if "expand_json_data" not in cfo:
             cfo["expand_json_data"] = ""
-        ad = SkodaAdapter(cfo["user"], cfo["password"])
+        ad = SkodaAdapter(cfo["user"], cfo["password"], cfo["spin"])
         await ad.init()
         mqttc = mqtt.Client()
         if "brokeruser" in cfo and "brokerpassword" in cfo:
@@ -156,6 +156,7 @@ async def configSample():
             "brokerpassword" : "",
             "user" : "",
             "password" : "",
+            "spin" : "",
             "expand_json_data" : "1"
         }, cfile)
 
@@ -487,6 +488,80 @@ class SkodaAdapter:
             await asyncio.sleep(60)
 
             
+    async def setHeating(self, vin):
+        _LOGGER.info("=============HEATING=============")
+        secToken = await self.requestSecToken(vin)
+        url = await self.replaceVarInUrl("$homeregion/fs-car/bs/rs/v1/$type/$country/vehicles/$vin/action", vin)
+        accept = "application/vnd.vwg.mbb.RemoteStandheizung_v2_0_2+json"
+
+        r = (await self.execRequest({
+            "url": url,
+            #startMode can be "heating" or "ventilation"
+            #"params" : "{ \"performAction\": { \"quickstart\": { \"climatisationDuration\": 10, \"startMode\": \"heating\", \"active\": true } } }",
+            "params" : "{ \"performAction\": { \"quickstop\": { \"active\": false } } }",
+            "headers": {
+                    "User-Agent": "OneConnect/200605002 CFNetwork/1128 Darwin/19.6.0",
+                    "X-App-Version": self.config["xappversion"],
+                    "X-App-Name": self.config["xappname"],
+                    "Authorization": "Bearer " + self.vwtokens["atoken"],
+                    "Accept-charset": "UTF-8",
+                    "Accept": accept,
+                    "Content-Type" : "application/vnd.vwg.mbb.RemoteStandheizung_v2_0_2+json",
+                    "x-mbbSecToken" : secToken
+            },
+            "method": "POST",
+            "allowRedirects": False
+        })).json()
+        if "performActionResponse" not in r or "requestId" not in r["performActionResponse"] or "vin" not in r["performActionResponse"]:
+            _LOGGER.info("Seems problem with heating set. Output: %s" % r)
+        else:
+            _LOGGER.info("======= Heating request processed correctly for vin %s, requestId:%s" % (r["performActionResponse"]["vin"],r["performActionResponse"]["requestId"]))
+
+
+    async def requestSecToken(self,vin):
+        url = await self.replaceVarInUrl("https://mal-1a.prd.ece.vwg-connect.com/api/rolesrights/authorization/v2/vehicles/$vin/services/rheating_v1/operations/P_QSACT/security-pin-auth-requested", vin)
+        r = await self.execRequest({
+            "url": url,
+            "method": "GET",
+            "headers": {
+                "User-Agent": "okhttp/3.7.0",
+                "X-App-Version": self.config["xappversion"],
+                "X-App-Name": self.config["xappname"],
+                "Authorization": "Bearer " + self.vwtokens["atoken"],
+                "Accept": "application/json",
+            },
+            "followAllRedirects": True
+        })
+        b = r.json()
+        secToken = b["securityPinAuthInfo"]["securityToken"]
+        challenge = b["securityPinAuthInfo"]["securityPinTransmission"]["challenge"]
+        securpin = await self.generateSecurPin(challenge, self.config["spin"])
+        body = "{ \"securityPinAuthentication\": { \"securityPin\": { \"challenge\": \""+challenge+"\", \"securityPinHash\": \""+securpin+"\" }, \"securityToken\": \""+secToken+"\" }}"
+
+        r = (await self.execRequest({
+            "url": "https://mal-1a.prd.ece.vwg-connect.com/api/rolesrights/authorization/v2/security-pin-auth-completed",
+            "params" : body,
+            "headers": {
+                    "User-Agent": "okhttp/3.7.0",
+                    "Content-Type" : "application/json",
+                    "X-App-Version": self.config["xappversion"],
+                    "X-App-Name": self.config["xappname"],
+                    "Authorization": "Bearer " + self.vwtokens["atoken"],
+                    "Accept": "application/json"
+            },
+            "method": "POST",
+            "allowRedirects": True
+        })).json()
+        return r["securityToken"]
+
+
+    async def generateSecurPin(self,challenge, pin):
+        pinArray = bytearray.fromhex(pin);
+        byteChallenge = bytearray.fromhex(challenge);
+        pinArray.extend(byteChallenge)
+        return hashlib.sha512(pinArray).hexdigest()
+
+
     async def getVehicleStatus(self, vin):
         _LOGGER.debug("Getting Vehicle Status for %s", vin)
         url = await self.replaceVarInUrl("$homeregion/fs-car/bs/vsr/v1/$type/$country/vehicles/$vin/status", vin)
@@ -836,7 +911,8 @@ class SkodaAdapter:
                 )
             )
         else:
-            data = req["params"] if "params" in req and len(req["params"].keys())> 0 else {}
+            #data = req["params"] if "params" in req and len(req["params"].keys())> 0 else {}
+            data = req["params"] if "params" in req and (len(req["params"]) > 0 or len(req["params"].keys())> 0) else {}
             allowRedirects = req["allowRedirects"] if "allowRedirects" in req else True
             headers = req["headers"] if "headers" in req else {}
             r = await loop.run_in_executor(None,
@@ -978,10 +1054,10 @@ class SkodaAdapter:
         await self.getTokens(skodaURL)
     
 
-    def __init__(self, email, password):
+    def __init__(self, email, password, spin):
         self.config = {
             "country": "CZ",
-            "xappversion": "3.2.6",
+            "xappversion": "3.4.2",
             "xappname": "cz.skodaauto.connect",
             "xClientId": "28cd30c6-dee7-4529-a0e6-b1e07ff90b79",
             "client_id": "7f045eee-7003-4379-9968-9355ed2adb06%40apps_vw-dilab_com",
@@ -990,6 +1066,7 @@ class SkodaAdapter:
         }
         self.config["email"] = email
         self.config["password"] = password
+        self.config["spin"] = spin
 
         
     async def init(self):
@@ -1001,6 +1078,7 @@ class SkodaAdapter:
     #            t = await self.getVehicleRights(car)
                 hr = await self.getHomeRegion(car)
                 rq = await self.getVehicleStatus(car)
+    #            th = await self.setHeating(car)
 
 
 if __name__ == "__main__":
